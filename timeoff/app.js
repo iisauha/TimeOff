@@ -170,17 +170,9 @@ function drawChart(animate) {
   }).join('')}</div></div>`;
   chart = { items, pa, ps };
   selIdx = null;
-  scrollChartToThisMonth();
-}
-/* Always open with this month's first bar at the left edge: earlier months are a swipe to the left,
-   future months a swipe to the right. */
-function scrollChartToThisMonth() {
-  const sc = $('barScroll'); if (!sc || !chart) return;
-  const first = L.today().slice(0, 7) + '-01';
-  let i = chart.items.findIndex(it => it.date >= first);
-  if (i < 0) i = chart.items.length - 1;
-  const col = sc.querySelectorAll('.bar-col')[i]; if (!col) return;
-  sc.scrollLeft = Math.max(0, col.offsetLeft - (parseFloat(getComputedStyle(sc).paddingLeft) || 0));
+  // open with the latest past deposit in view
+  const sc = $('barScroll'), past = [...sc.querySelectorAll('.bar-col:not(.future)')], lastPast = past[past.length - 1];
+  if (lastPast) sc.scrollLeft = Math.max(0, lastPast.offsetLeft - sc.clientWidth * 0.55);
 }
 $('chart').addEventListener('click', e => {
   const col = e.target.closest('.bar-col'); if (!col) return;
@@ -194,18 +186,7 @@ $('chart').addEventListener('click', e => {
   if (navigator.vibrate) navigator.vibrate(4);
   showDate(it.date, L.fmtDate(it.date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + (it.future ? ', projected' : ''));
 });
-// Redraw only when the width really changes (rotation), so a toolbar showing or hiding never
-// snaps the chart back while someone is swiping through it.
-let chartW = window.innerWidth;
-window.addEventListener('resize', () => {
-  if (window.innerWidth === chartW) return;
-  chartW = window.innerWidth;
-  if (view === 'home') drawChart(false);
-});
-// Coming back to the app: start again from this month (and pick up a new day).
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && view === 'home' && S.setupDone) renderHome(false);
-});
+window.addEventListener('resize', () => { if (view === 'home') drawChart(false); });
 
 /* ---------- sheets ---------- */
 let lastFocus = null;
