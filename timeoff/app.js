@@ -12,6 +12,10 @@ const thisYear = new Date().getFullYear();
 const dShort = d => L.fmtDate(d, L.parse(d).getFullYear() === thisYear ? { weekday: 'short', month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
 const mLong = ym => L.fmtMonth(ym);
 const mName = ym => L.parse(ym + '-01').toLocaleDateString('en-US', { month: 'long' });
+/* How far ahead the chart and the deposit dates reach: through the end of the month 18 months from now. */
+const AHEAD_MONTHS = 18;
+const aheadYM = () => { let ym = L.today().slice(0, 7); for (let i = 0; i < AHEAD_MONTHS; i++) ym = L.nextMonth(ym); return ym; };
+const aheadEnd = () => L.iso(L.addDays(L.parse(L.nextMonth(aheadYM()) + '-01'), -1));
 const prevMonth = ym => { let [y, m] = ym.split('-').map(Number); m--; if (!m) { m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
 const days = m => L.fmtDays(m, S.dayMins);
 const dayWord = m => days(m) === '1' ? 'day' : 'days';
@@ -141,7 +145,7 @@ let chart = null, selIdx = null;
 const BAR_H = 220;                       // px height of the bar area; every bar uses this same scale
 function drawChart(animate) {
   const wrap = $('chart'); if (!wrap) return;
-  const t = L.today(), end = L.iso(L.addDays(L.parse(t), 190));   // about 6 months ahead
+  const t = L.today(), end = aheadEnd();   // through the month 18 months from now
   const pa = L.series(S, 'annual', end), ps = L.series(S, 'sick', end);
   const dates = new Set();
   let ym = S.startDate.slice(0, 7);
@@ -166,9 +170,17 @@ function drawChart(animate) {
   }).join('')}</div></div>`;
   chart = { items, pa, ps };
   selIdx = null;
-  // open with the latest past deposit in view
-  const sc = $('barScroll'), past = [...sc.querySelectorAll('.bar-col:not(.future)')], lastPast = past[past.length - 1];
-  if (lastPast) sc.scrollLeft = Math.max(0, lastPast.offsetLeft - sc.clientWidth * 0.55);
+  scrollChartToThisMonth();
+}
+/* Always open with this month's first bar at the left edge: earlier months are a swipe to the left,
+   future months a swipe to the right. */
+function scrollChartToThisMonth() {
+  const sc = $('barScroll'); if (!sc || !chart) return;
+  const first = L.today().slice(0, 7) + '-01';
+  let i = chart.items.findIndex(it => it.date >= first);
+  if (i < 0) i = chart.items.length - 1;
+  const col = sc.querySelectorAll('.bar-col')[i]; if (!col) return;
+  sc.scrollLeft = Math.max(0, col.offsetLeft - (parseFloat(getComputedStyle(sc).paddingLeft) || 0));
 }
 $('chart').addEventListener('click', e => {
   const col = e.target.closest('.bar-col'); if (!col) return;
@@ -182,7 +194,18 @@ $('chart').addEventListener('click', e => {
   if (navigator.vibrate) navigator.vibrate(4);
   showDate(it.date, L.fmtDate(it.date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + (it.future ? ', projected' : ''));
 });
-window.addEventListener('resize', () => { if (view === 'home') drawChart(false); });
+// Redraw only when the width really changes (rotation), so a toolbar showing or hiding never
+// snaps the chart back while someone is swiping through it.
+let chartW = window.innerWidth;
+window.addEventListener('resize', () => {
+  if (window.innerWidth === chartW) return;
+  chartW = window.innerWidth;
+  if (view === 'home') drawChart(false);
+});
+// Coming back to the app: start again from this month (and pick up a new day).
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && view === 'home' && S.setupDone) renderHome(false);
+});
 
 /* ---------- sheets ---------- */
 let lastFocus = null;
@@ -493,7 +516,8 @@ $('openWorkday').addEventListener('click', () => {
 /* When hours are added */
 function renderDates() {
   const t = L.today();
-  let ym = S.startDate.slice(0, 7), end = `${thisYear + 1}-12`, html = '';
+  let ym = S.startDate.slice(0, 7), html = '';
+  const end = [`${thisYear + 1}-12`, aheadYM()].sort()[1];
   for (let i = 0; i < 120 && ym <= end; i++) {
     const pd = L.postDate(S, ym), src = L.postSource(S, ym);
     const tag = pd <= t ? ['counted', 'Added'] : { edited: ['edited', 'Edited'], official: ['official', 'City schedule'], estimated: ['est', 'Estimated'], actual: ['counted', 'Added'] }[src];
