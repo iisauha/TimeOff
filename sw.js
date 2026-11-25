@@ -1,10 +1,10 @@
 /* Offline support. Network first, so a new version shows up right away when online;
    falls back to the cached copy when offline. */
-const CACHE = 'dep-dashboard-v30';
+const CACHE = 'dep-dashboard-v31';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './assets/app.css',
   './timeoff/', './timeoff/index.html', './timeoff/app.js', './timeoff/leave.js',
-  './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'
+  './icons/icon-v2.svg', './icons/icon-v2-192.png', './icons/icon-v2-512.png', './icons/apple-touch-icon-v2.png'
 ];
 
 self.addEventListener('install', e => {
